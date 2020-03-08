@@ -23,3 +23,11 @@ fn test_js() {
     }
 }
 ```
+
+`Test` is the primary way to interact with this crate, it contains
+a bulk of the information one would need to test a test262 file.
+
+The `Test` structure includes 3 top-level properties, the path 
+to the file being tested, the string contents of that file and
+the metadata, contained in the multi-line comment (as YAML) prefix
+to all files, about each JavaScript test.
