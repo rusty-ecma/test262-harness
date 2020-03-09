@@ -1,6 +1,6 @@
 [package]
 name = "test262-harness"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["rfm <r@robertmasen.pizza>"]
 repository = "https://github.com/rusty-ecma/test262-harness"
 edition = "2018"
