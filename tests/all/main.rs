@@ -2,14 +2,14 @@ use test262_harness::{Flag, Harness, Phase};
 
 #[test]
 fn check_all_from_repo() {
-    for t in Harness::new("test262").unwrap() {
+    for t in Harness::new("test262/test").unwrap() {
         t.unwrap();
     }
 }
 
 #[test]
 fn check_readme_code() {
-    for test in Harness::new("test262").unwrap() {
+    for test in Harness::new("test262/test").unwrap() {
         let test = test.unwrap();
         println!("running test from {:?}", test.path);
         if let Some(id) = &test.desc.id {
