@@ -45,15 +45,43 @@ impl Harness {
         Ok(Self { test_paths, idx: 0 })
     }
 
-    fn create_test_from(&self, p: &PathBuf) -> Result<Test, Error> {
+    fn create_test_from_file(p: &PathBuf) -> Result<Test, Error> {
         let contents = std::fs::read_to_string(p)?;
-        let (yaml_start, yaml_end) = Self::find_yaml(&contents, p)?;
+        Self::create_test(contents, p.clone())
+    }
+    
+    pub(crate) fn create_test(contents: String, path: PathBuf) -> Result<Test, Error> {
+        let (yaml_start, yaml_end) = Self::find_yaml(&contents, &path)?;
         let yaml = contents[yaml_start..yaml_end].replace("\r", "\n");
+        let license = Self::find_license(&contents)?;
         let desc = serde_yaml::from_str(&yaml)?;
         Ok(Test {
             desc,
-            path: p.clone(),
+            license,
+            path,
             source: contents,
+        })
+    }
+
+    fn find_license(content: &str) -> Result<Option<(usize, usize)>, Error> {
+        let pattern = regex::Regex::new(r"(?ix:
+        // Copyright( \([C]\))? (\w+) .+\. {1,2}All rights reserved\.[\r\n]{1,2}
+            (
+                // This code is governed by the( BSD)? license found in the LICENSE file\.
+                |
+                // See LICENSE for details.
+                |
+                // Use of this source code is governed by a BSD-style license that can be[\r\n]{1,2}
+                // found in the LICENSE file\.
+                |
+                // See LICENSE or https://github\.com/tc39/test262/blob/master/LICENSE
+            )([ \t]*[\r\n]{1,2})*)")?;
+        Ok(if let Some(matches) = pattern.find(content) {
+            let start = matches.start();
+            let end = matches.end();
+            Some((start, end))
+        } else {
+            None
         })
     }
 
@@ -76,7 +104,7 @@ impl Iterator for Harness {
         } else {
             let p = self.test_paths.get(self.idx)?;
             self.idx += 1;
-            Some(self.create_test_from(p))
+            Some(Self::create_test_from_file(p))
         }
     }
 }
@@ -93,6 +121,14 @@ pub struct Test {
     /// The parsed metadata from the
     /// file
     pub desc: Description,
+    license: Option<(usize, usize)>,
+}
+
+impl Test {
+    pub fn license(&self) -> Option<&str> {
+        let (open, end) = self.license?;
+        Some(&self.source[open..end])
+    }
 }
 
 /// The parsed metadata from the
@@ -195,4 +231,74 @@ pub enum Flag {
     /// one way depending on implementation
     #[serde(alias = "non-deterministic")]
     NonDeterministic,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn create_test() {
+        let yaml = "
+// License!!!
+/*---
+id: dummytest
+esid: dummyesid
+es5id: dummyes5id
+es6id: dummyes6id
+info: |
+  a sentence about the stuff
+description: a handy description
+negative:
+  phase: parse
+  type: Exception
+flags: [noStrict]
+locale: [en-us]
+features: [BestFeature]
+---*/
+let x = 'javascript';";
+        let result = Harness::create_test(yaml.to_string(), PathBuf::new()).unwrap();
+        let Test{desc, ..} = result;
+        assert_eq!(desc.id, Some("dummytest".to_string()));
+        assert_eq!(desc.esid, Some("dummyesid".to_string()));
+        assert_eq!(desc.es5id, Some("dummyes5id".to_string()));
+        assert_eq!(desc.es6id, Some("dummyes6id".to_string()));
+        assert_eq!(desc.info, Some("a sentence about the stuff\n".to_string()));
+        assert_eq!(desc.description, Some("a handy description".to_string()));
+        assert_eq!(&desc.flags, &[Flag::NoStrict]);
+        assert_eq!(&desc.locale, &["en-us".to_string()]);
+        assert_eq!(&desc.features, &["BestFeature".to_string()]);
+        let negative = desc.negative.unwrap();
+        assert_eq!(negative.phase, Phase::Parse);
+        assert_eq!(negative.kind, Some("Exception".to_string()));
+    }
+
+    #[test]
+    fn can_not_get_license() {
+        let yaml = "
+// License!!!
+/*---
+id: dummytest
+---*/
+let x = 'javascript';
+";
+        let result = Harness::create_test(yaml.to_string(), PathBuf::new()).unwrap();
+        assert_eq!(result.license(), None);
+    }
+
+    #[test]
+    fn can_get_license() {
+        let yaml = "// Copyright (c) 2020 rusty-ecma.  All rights reserved.
+// This code is governed by the MIT license found in the LICENSE file.
+
+/*---
+id: dummytest
+---*/
+let x = 'javascript';
+";
+        let result = Harness::create_test(yaml.to_string(), PathBuf::new()).unwrap();
+        assert_eq!(result.license(), Some("// Copyright (c) 2020 rusty-ecma.  All rights reserved.
+// This code is governed by the MIT license found in the LICENSE file.
+"));
+    }
 }

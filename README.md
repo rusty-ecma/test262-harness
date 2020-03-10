@@ -12,7 +12,7 @@ test262-harness = "*"
 // lib.rs
 #[test]
 fn test_js() {
-    let test262_path = "test262";
+    let test262_path = "test262/test/";
     let harness = Harness::new(test262_path).expect("failed to initialize harness");
     for test in harness {
         let test = test.unwrap();

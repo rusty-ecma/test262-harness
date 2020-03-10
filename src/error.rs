@@ -4,6 +4,7 @@ pub enum Error {
     Io(std::io::Error),
     WalkDir(walkdir::Error),
     Yaml(serde_yaml::Error),
+    Regex(regex::Error),
     DescriptionInvalid(PathBuf),
 }
 
@@ -13,6 +14,7 @@ impl std::fmt::Display for Error {
             Error::Io(e) => e.fmt(f),
             Error::WalkDir(e) => e.fmt(f),
             Error::Yaml(e) => e.fmt(f),
+            Error::Regex(e) => e.fmt(f),
             Error::DescriptionInvalid(path) => {
                 write!(f, "Unable to extract description for {:?}", path)
             }
@@ -36,5 +38,11 @@ impl From<walkdir::Error> for Error {
 impl From<serde_yaml::Error> for Error {
     fn from(other: serde_yaml::Error) -> Self {
         Self::Yaml(other)
+    }
+}
+
+impl From<regex::Error> for Error {
+    fn from(other: regex::Error) -> Self {
+        Self::Regex(other)
     }
 }
